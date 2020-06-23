@@ -51,7 +51,7 @@ commands as an option
     wq sub job_file 
 
 A job file contains a "command" and a set of requirements; see the Job Files
-section for more details.  
+section for more details.
 
 If -b/--batch is sent, the job or jobs are submitted in batch mode in the
 **background**, whereas normaly jobs are kept in the foreground.  Batch mode
@@ -75,38 +75,59 @@ name of the yaml job file.
 The job files and requirements are all in YAML syntax
 <http://en.wikipedia.org/wiki/YAML>.  For example, this is a job file to run
 the command "dostuff" on a single core.
-
-    command: dostuff
-
+```yaml
+command: dostuff
+```
 Don't forget the space between the colon ":" and the value.  The command can
 actually be a full script.  Just put a **pipe symbol "|"** after command: and
 then **indent the lines**.  For example
-
-    command: |
-        source ~/.bashrc
-        cd ~/mydata
-        cat data.txt | awk '{print $3}' 1> list.txt 2> list.err
-
-You can also put requirements in the job file.  For example, to grab 3 cores
-and only use  nodes from groups gen1 and gen2, but not group slow
-
-    command: dostuff 1> dostuff.out 2> dostuff.err
-    N: 3
-    group: [gen1, gen3]
-    notgroup: slow
-
-Note group/notgroup are special in that they can take either a scalar or a
+```yaml
+command: |
+    source ~/.bashrc
+    cd ~/mydata
+    cat data.txt | awk '{print $3}' 1> list.txt 2> list.err
+```
+You can put requirements in the job file.  For example, if you want to use more
+than one core, add the `N` specifier.
+```yaml
+command: dostuff
+N: 35
+```
+Note these 35 cores will not generally be from the same node!  To make sure
+you get only cores from the same node specify the mode to be `by_core1`
+```yaml
+command: dostuff
+N: 8
+mode: by_core1
+```
+You can also just get an entire node, or nodes by specifying mode `by_node`.
+This asks for two full nodes (`N` refers to number of nodes when mode is
+`by_node`):
+```yaml
+command: dostuff
+N: 2
+mode: by_node
+```
+To grab 100 cores and only use nodes from groups gen1 and gen2, but not group
+slow
+```yaml
+command: dostuff 1> dostuff.out 2> dostuff.err
+N: 100
+group: [gen1, gen3]
+not_group: slow
+```
+Note group/not_group are special in that they can take either a scalar or a
 list. You can also specify lists using note-taking notation
-
-    group:
-        - gen1
-        - gen2
-
+```yaml
+group:
+    - gen1
+    - gen2
+```
 Don't forget the space between dash "-" and value. See the Requirements
 sub-section for a full list of requirements
 
 
-### specifying comands as arguments
+### Specifying comands as arguments
 
 In addition to using job files, you can run a command by specifying -c and an
 argument
@@ -121,7 +142,7 @@ Remember to quote commands that have spaces/arguments.   For example,
 
 You can specify requirements on the command line using -r/--require.
 
-    wq sub -r "mode: bynode; N: 5" -c some_command
+    wq sub -r "mode: by_node; N: 5" -c some_command
 
 Each requirement is valid YAML. Note, however, that each element is separated
 by a semicolon, which is **not** valid YAML.  Internally the semicolons are
@@ -139,75 +160,105 @@ You can use requirements to change what nodes are selected for your job. The fol
 is the full list
 
 * mode - The mode of node selection.  Available modes are
- * bycore - Select single cores.  Modifiers like *N* refer to number of cores.
- * bycore1 - Select cores from a single node.
- * bynode - Select full nodes.  Modifiers like *N* refer to number of nodes.
- * byhost - Select a particular host by name.  Modifiers like *N* refer to number of cores.
- * bygroup - Select **all** the nodes from particular groups; different from the *group* requirement.
+  * by_core - Select single cores.  Modifiers like *N* refer to number of cores.
+  * by_core1 - Select cores from a single node.
+  * by_node - Select full nodes.  Modifiers like *N* refer to number of nodes.
+  * by_host - Select a particular host by name.  Modifiers like *N* refer to number of cores.
+  * by_group - Select **all** the nodes from particular groups; different from the *group* requirement.
 * N - The number of nodes or cores, depending on the mode.
 * group - Select cores or nodes from the specified group or groups.  This can be a scalar or list
-* notgroup - Select cores or nodes from machines not in the specified group or groups.
-* host - The host name. When mode is byhost, you must also send this requirement
-* min_cores - Limit to nodes with at least this many cores.  Only applies when mode is *bynode*.
-* min_mem - Limit to nodes with at least this much memory in GB.  Only applies when mode is *bycore*, *bycore1*, *bynode*.
-* X - This determines if ssh X display forwarding is used, default is False. For yes use true,1 for no use false,0
+* not_group - Select cores or nodes from machines not in the specified group or groups.
+* host - The host name. When mode is by_host, you must also send this requirement
+* min_cores - Limit to nodes with at least this many cores.  Only applies when mode is *by_node*.
+* min_mem - Limit to nodes with at least this much memory in GB.  Only applies when mode is *by_core*, *by_core1*, *by_node*.
+* X - This determines if ssh X display forwarding is used, default is False. For yes use true or 1 for no use false or 0
 * priority - Currently should be one of 
- * low - lowest priority
- * med - medium priority, the default
- * high - high priority
- * block - block other jobs until this one can run.
+  * low - lowest priority
+  * med - medium priority, the default
+  * high - high priority
+  * block - block other jobs until this one can run.
 * job_name - A name to display in job listings. Usually the command, or an abbreviated form of the command, is shown.
 * hostfile - An optional file in which to save allocated node names. Useful for MPI jobs using mpirun. If hostfile equals to 'auto' a name will be generated automatically and put in place of %hostfile% in command line
 * threads - An optional argument that controls hosts listed in hostfile for running hybrid jobs. See example below.
 
+### More example job files
 
-Here is a full, commented example
+Simple one core example
+```yaml
+# these are the commands to be run.  if you only have a 
+# single command, you can use a single line such as 
+# command: ./script
 
-    # these are the commands to be run.  if you only have a 
-    # single command, you can use a single line such as 
-    # command: ./script
+command: |
+    source ~/.bashrc
+    echo "hello world"
+    sleep 30
 
-    command: |
-        source ~/.bashrc
-        OMP_NUM_THREADS=%threads% mpirun -hostfile %hostfile% ./program
+# show this name in job listings instead of the command
+job_name: test
+```
 
-    # show this name in job listings instead of the command
-    job_name: dostuff35 
+Running on a full node, with machine group selection
+```yaml
+command: |
+    source ~/.bashrc
+    ./multi-core-job
 
-    # this is the type of node/host selection. bynode means select entire
-    # nodes.
-    mode: bynode
+# show this name in job listings instead of the command
+job_name: test
 
-    # Since the mode is bynode, this means 5 full nodes
-    N: 5
-    
-    # Select from this group(s)
-    group: new
+# this is the type of node/host selection. by_node means select entire
+# nodes.
+mode: by_node
 
-    # Do not select from this set of groups
-    notgroup: [slow,crappy]
+# Select from this group(s)
+group: new
 
-    # require at least this many cores
-    min_cores: 8
+# Do not select from this set of groups
+not_group: [slow, crappy]
 
-    # used by MPI jobs
-    hostfile: auto
+# require at least this many cores
+min_cores: 8
+```
 
-    # If we have 5 full nodes of 12 cores each,
-    # there is 60 cores in total. Threads:4 ensures each
-    # host is listed 3 times. So the command above will
-    # run 15 MPI nodes of 4 threads each
+An example with mpi
+```yaml
+command: |
+    source ~/.bashrc
+    mpirun -hostfile %hostfile% ./program
 
-    threads: 4
+# show this name in job listings instead of the command
+job_name: dostuff35 
 
-### running an MPI code
+N: 125
+
+# used by MPI jobs
+hostfile: auto
+```
 
 
-To run an MPI code, get hostnames through the hostfile requirement, e.g.
+MPI example specifying threads 
+```yaml
+command: |
+    source ~/.bashrc
+    OMP_NUM_THREADS=%threads% mpirun -hostfile %hostfile% ./program
 
-    wq -r "N:16;hostfile:auto" -c "mpirun -hostfile %hostfile% ./mycode"
+# show this name in job listings instead of the command
+job_name: dostuff35 
 
+mode: bynode
+N: 5
 
+# used by MPI jobs
+hostfile: auto
+
+# If we have 5 full nodes of 12 cores each,
+# there is 60 cores in total. Threads:4 ensures each
+# host is listed 3 times. So the command above will
+# run 15 MPI nodes of 4 threads each
+
+threads: 4
+```
 
 Getting an interactive shell on a worker node
 ---------------------------------------------
@@ -234,9 +285,13 @@ You can also specify Ncores, or even combine them
     wq limit "Njobs: 25; Ncores: 100"
 
 These data are saved in a file on disk and reloaded when the server is
-restarted.  You can remove limits by setting them to -1, e.g.
+restarted.  You can remove a limit by setting it to -1, e.g.
 
-    wq limit "Njobs: -1; Ncores: -1"
+    wq limit "Njobs: -1"
+
+Remove all limits using the clear sub-command
+
+    wq limit clear
 
 Tips and Tricks
 ---------------
@@ -291,7 +346,7 @@ status.
     wq stat
 
 For each node, the usage is displayed using an asterisk * for used cores and a
-dot . for unused cores.  for example [***....] means three used and 4 unused
+dot . for unused cores.  for example `[***....]` means three used and 4 unused
 cores.  Also displayed is the memory available in gigabytes and the groups for
 each host.
 
@@ -395,23 +450,4 @@ Installation
 
 ### Dependencies
 
-You need a fairly recent python and pyyaml <http://pyyaml.org/>
-
-### Install
-
-Get the source, untar it, cd into the created directory, and type this
-to install into the "usual" place
-
-    python setup.py install
-
-To install into a particular prefix
-
-    python setup.py install --prefix=/some/path
-
-
-Authors
--------
-
-Erin Sheldon: erin dot sheldon at gmail dot com
-
-Anze Slosar: anze at bnl dot gov
+You need python 2.7 or later and pyyaml <http://pyyaml.org/>
